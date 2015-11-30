@@ -133,6 +133,83 @@ pass the input to <code>call</code> and get error set as the response</li>
 </ul>
 
 <h3>
+<a id="optional-keys" class="anchor" href="#optional-keys" aria-hidden="true"><span class="octicon octicon-link"></span></a>Optional Keys</h3>
+
+<p>You can define which keys are optional and define rules for their values:</p>
+
+<div class="highlight highlight-source-ruby"><pre><span class="pl-k">require</span> <span class="pl-s"><span class="pl-pds">'</span>dry-validation<span class="pl-pds">'</span></span>
+
+<span class="pl-k">class</span> <span class="pl-en">Schema<span class="pl-e"> &lt; Dry::Validation::Schema</span></span>
+  key(<span class="pl-c1">:email</span>) { |<span class="pl-smi">email</span>| email.filled? }
+
+  optional(<span class="pl-c1">:age</span>) <span class="pl-k">do </span>|<span class="pl-smi">age</span>|
+    age.int? <span class="pl-k">&amp;</span> age.gt?(<span class="pl-c1">18</span>)
+  <span class="pl-k">end</span>
+<span class="pl-k">end</span>
+
+schema <span class="pl-k">=</span> <span class="pl-c1">Schema</span>.<span class="pl-k">new</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">email:</span> <span class="pl-s"><span class="pl-pds">'</span>jane@doe.org<span class="pl-pds">'</span></span>)
+
+puts errors.inspect
+<span class="pl-c"># []</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">email:</span> <span class="pl-s"><span class="pl-pds">'</span>jane@doe.org<span class="pl-pds">'</span></span>, <span class="pl-c1">age:</span> <span class="pl-c1">17</span>)
+
+puts errors.inspect
+<span class="pl-c"># [[:age, ["age must be greater than 18 (17 was given)"]]]</span></pre></div>
+
+<h3>
+<a id="optional-values" class="anchor" href="#optional-values" aria-hidden="true"><span class="octicon octicon-link"></span></a>Optional Values</h3>
+
+<p>When it is valid for a given value to be <code>nil</code> you can use <code>none?</code> predicate:</p>
+
+<div class="highlight highlight-source-ruby"><pre><span class="pl-k">require</span> <span class="pl-s"><span class="pl-pds">'</span>dry-validation<span class="pl-pds">'</span></span>
+
+<span class="pl-k">class</span> <span class="pl-en">Schema<span class="pl-e"> &lt; Dry::Validation::Schema</span></span>
+  key(<span class="pl-c1">:email</span>) { |<span class="pl-smi">email</span>| email.filled? }
+
+  key(<span class="pl-c1">:age</span>) <span class="pl-k">do </span>|<span class="pl-smi">age</span>|
+    age.none? <span class="pl-k">|</span> (age.int? <span class="pl-k">&amp;</span> age.gt?(<span class="pl-c1">18</span>))
+  <span class="pl-k">end</span>
+<span class="pl-k">end</span>
+
+schema <span class="pl-k">=</span> <span class="pl-c1">Schema</span>.<span class="pl-k">new</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">email:</span> <span class="pl-s"><span class="pl-pds">'</span>jane@doe.org<span class="pl-pds">'</span></span>, <span class="pl-c1">age:</span> <span class="pl-c1">nil</span>)
+
+puts errors.inspect
+<span class="pl-c"># []</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">email:</span> <span class="pl-s"><span class="pl-pds">'</span>jane@doe.org<span class="pl-pds">'</span></span>, <span class="pl-c1">age:</span> <span class="pl-c1">19</span>)
+
+puts errors.inspect
+<span class="pl-c"># []</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">email:</span> <span class="pl-s"><span class="pl-pds">'</span>jane@doe.org<span class="pl-pds">'</span></span>, <span class="pl-c1">age:</span> <span class="pl-c1">17</span>)
+
+puts errors.inspect
+<span class="pl-c"># [[:age, ["age must be greater than 18 (17 was given)"]]]</span></pre></div>
+
+<h3>
+<a id="optional-key-vs-value" class="anchor" href="#optional-key-vs-value" aria-hidden="true"><span class="octicon octicon-link"></span></a>Optional Key vs Value</h3>
+
+<p>We make a clear distinction between specifying an optional <code>key</code> and an optional
+<code>value</code>. This gives you a way of being very specific about validation rules. You
+can define a schema which can give you precise errors when a key was missing or
+key was present but the value was nil.</p>
+
+<p>This also comes with the benefit of being explicit about the type expectation.
+In the example above we explicitly state that <code>:age</code> <em>can be nil</em> or it <em>can be an integer</em>
+and when it <em>is an integer</em> we specify that it <em>must be greater than 18</em>.</p>
+
+<p>Another benefit is that we can infer specific coercion rules when types are specified.
+In example <a href="https://github.com/dryrb/dry-validation#form-validation-with-coercions"><code>Schema::Form</code></a>
+will use <code>form.nil</code> type from dry-data to coerce empty strings into <code>nil</code> for you
+whenever you specify <code>value.none? | value.int?</code>. Furthermore it will try to coerce
+to <code>int</code> since that is our type expectation.</p>
+
+<h3>
 <a id="nested-hash" class="anchor" href="#nested-hash" aria-hidden="true"><span class="octicon octicon-link"></span></a>Nested Hash</h3>
 
 <p>We are free to define validations for anything, including deeply nested structures:</p>
@@ -141,17 +218,19 @@ pass the input to <code>call</code> and get error set as the response</li>
 
 <span class="pl-k">class</span> <span class="pl-en">Schema<span class="pl-e"> &lt; Dry::Validation::Schema</span></span>
   key(<span class="pl-c1">:address</span>) <span class="pl-k">do </span>|<span class="pl-smi">address</span>|
-    address.key(<span class="pl-c1">:city</span>) <span class="pl-k">do </span>|<span class="pl-smi">city</span>|
-      city.min_size?(<span class="pl-c1">3</span>)
-    <span class="pl-k">end</span>
+    address.hash? <span class="pl-k">do</span>
+      address.key(<span class="pl-c1">:city</span>) <span class="pl-k">do </span>|<span class="pl-smi">city</span>|
+        city.min_size?(<span class="pl-c1">3</span>)
+      <span class="pl-k">end</span>
 
-    address.key(<span class="pl-c1">:street</span>) <span class="pl-k">do </span>|<span class="pl-smi">street</span>|
-      street.filled?
-    <span class="pl-k">end</span>
+      address.key(<span class="pl-c1">:street</span>) <span class="pl-k">do </span>|<span class="pl-smi">street</span>|
+        street.filled?
+      <span class="pl-k">end</span>
 
-    address.key(<span class="pl-c1">:country</span>) <span class="pl-k">do </span>|<span class="pl-smi">country</span>|
-      country.key(<span class="pl-c1">:name</span>, <span class="pl-k">&amp;</span><span class="pl-c1">:filled?</span>)
-      country.key(<span class="pl-c1">:code</span>, <span class="pl-k">&amp;</span><span class="pl-c1">:filled?</span>)
+      address.key(<span class="pl-c1">:country</span>) <span class="pl-k">do </span>|<span class="pl-smi">country</span>|
+        country.key(<span class="pl-c1">:name</span>, <span class="pl-k">&amp;</span><span class="pl-c1">:filled?</span>)
+        country.key(<span class="pl-c1">:code</span>, <span class="pl-k">&amp;</span><span class="pl-c1">:filled?</span>)
+      <span class="pl-k">end</span>
     <span class="pl-k">end</span>
   <span class="pl-k">end</span>
 <span class="pl-k">end</span>
@@ -167,6 +246,77 @@ errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">address:<
 
 puts errors.inspect
 <span class="pl-c"># [[:address, [[:street, ["street is missing"]], [:country, ["country is missing"]]]]]</span></pre></div>
+
+<h3>
+<a id="array-elements" class="anchor" href="#array-elements" aria-hidden="true"><span class="octicon octicon-link"></span></a>Array Elements</h3>
+
+<p>You can use <code>each</code> rule for validating each element in an array:</p>
+
+<div class="highlight highlight-source-ruby"><pre><span class="pl-k">class</span> <span class="pl-en">Schema<span class="pl-e"> &lt; Dry::Validation::Schema</span></span>
+  key(<span class="pl-c1">:phone_numbers</span>) <span class="pl-k">do </span>|<span class="pl-smi">phone_numbers</span>|
+    phone_numbers.array? <span class="pl-k">do</span>
+      phone_numbers.each(<span class="pl-k">&amp;</span><span class="pl-c1">:str?</span>)
+    <span class="pl-k">end</span>
+  <span class="pl-k">end</span>
+<span class="pl-k">end</span>
+
+schema <span class="pl-k">=</span> <span class="pl-c1">Schema</span>.<span class="pl-k">new</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">phone_numbers:</span> <span class="pl-s"><span class="pl-pds">'</span><span class="pl-pds">'</span></span>)
+
+puts errors.inspect
+<span class="pl-c"># [[:phone_numbers, ["phone_numbers must be an array"]]]</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-c1">phone_numbers:</span> [<span class="pl-s"><span class="pl-pds">'</span>123456789<span class="pl-pds">'</span></span>, <span class="pl-c1">123456789</span>])
+
+puts errors.inspect
+<span class="pl-c"># [[:phone_numbers, [[:phone_numbers, ["phone_numbers must be a string"]]]]]</span></pre></div>
+
+<h3>
+<a id="form-validation-with-coercions" class="anchor" href="#form-validation-with-coercions" aria-hidden="true"><span class="octicon octicon-link"></span></a>Form Validation With Coercions</h3>
+
+<p>Probably the most common use case is to validate form params. This is a special
+kind of a validation for a couple of reasons:</p>
+
+<ul>
+<li>The input is a hash with stringified keys</li>
+<li>The input include values that are strings, hashes or arrays</li>
+<li>Prior validation, we need to coerce values and symbolize keys based on the
+information from rules</li>
+</ul>
+
+<p>For that reason, <code>dry-validation</code> ships with <code>Schema::Form</code> class:</p>
+
+<div class="highlight highlight-source-ruby"><pre><span class="pl-k">require</span> <span class="pl-s"><span class="pl-pds">'</span>dry-validation<span class="pl-pds">'</span></span>
+<span class="pl-k">require</span> <span class="pl-s"><span class="pl-pds">'</span>dry/validation/schema/form<span class="pl-pds">'</span></span>
+
+<span class="pl-k">class</span> <span class="pl-en">UserFormSchema<span class="pl-e"> &lt; Dry::Validation::Schema::Form</span></span>
+  key(<span class="pl-c1">:email</span>) { |<span class="pl-smi">value</span>| value.str? <span class="pl-k">&amp;</span> value.filled? }
+
+  key(<span class="pl-c1">:age</span>) { |<span class="pl-smi">value</span>| value.int? <span class="pl-k">&amp;</span> value.gt?(<span class="pl-c1">18</span>) }
+<span class="pl-k">end</span>
+
+schema <span class="pl-k">=</span> <span class="pl-c1">UserFormSchema</span>.<span class="pl-k">new</span>
+
+errors <span class="pl-k">=</span> schema.messages(<span class="pl-s"><span class="pl-pds">'</span>email<span class="pl-pds">'</span></span> =&gt; <span class="pl-s"><span class="pl-pds">'</span><span class="pl-pds">'</span></span>, <span class="pl-s"><span class="pl-pds">'</span>age<span class="pl-pds">'</span></span> =&gt; <span class="pl-s"><span class="pl-pds">'</span>18<span class="pl-pds">'</span></span>)
+
+puts errors.inspect
+
+<span class="pl-c"># [[:email, ["email must be filled"]], [:age, ["age must be greater than 18 (18 was given)"]]]</span></pre></div>
+
+<p>There are few major differences between how it works here and in <code>ActiveModel</code>:</p>
+
+<ul>
+<li>We have type checking as predicates, ie <code>gt?(18)</code> will not be applied if the value
+is not an integer</li>
+<li>Thus, error messages are provided <em>only for the rules that failed</em>
+</li>
+<li>There's a planned feature for generating "validation hints" which lists information
+about all possible rules</li>
+<li>Coercion is handled by <code>dry-data</code> coercible hash using its <code>form.*</code> types that
+are dedicated for this type of coercions</li>
+<li>It's very easy to add your own types and coercions (more info/docs coming soon)</li>
+</ul>
 
 <h3>
 <a id="defining-custom-predicates" class="anchor" href="#defining-custom-predicates" aria-hidden="true"><span class="octicon octicon-link"></span></a>Defining Custom Predicates</h3>
@@ -199,27 +349,55 @@ puts errors.inspect
   key(<span class="pl-c1">:email</span>) { |<span class="pl-smi">value</span>| value.str? <span class="pl-k">&amp;</span> value.email? }
 <span class="pl-k">end</span></pre></div>
 
+<p>You need to provide error messages for your custom predicates if you want them
+to work with <code>Schem#messages</code> interface.</p>
+
+<p>You can learn how to do that in the <a href="https://github.com/dryrb/dry-validation#error-messages">Error Messages</a> section.</p>
+
 <h2>
 <a id="list-of-built-in-predicates" class="anchor" href="#list-of-built-in-predicates" aria-hidden="true"><span class="octicon octicon-link"></span></a>List of Built-In Predicates</h2>
 
+<h3>
+<a id="basic-1" class="anchor" href="#basic-1" aria-hidden="true"><span class="octicon octicon-link"></span></a>Basic</h3>
+
+<ul>
+<li><code>none?</code></li>
+<li><code>eql?</code></li>
+<li><code>key?</code></li>
+</ul>
+
+<h3>
+<a id="types" class="anchor" href="#types" aria-hidden="true"><span class="octicon octicon-link"></span></a>Types</h3>
+
+<ul>
+<li><code>str?</code></li>
+<li><code>int?</code></li>
+<li><code>float?</code></li>
+<li><code>decimal?</code></li>
+<li><code>bool?</code></li>
+<li><code>date?</code></li>
+<li><code>date_time?</code></li>
+<li><code>time?</code></li>
+<li><code>array?</code></li>
+<li><code>hash?</code></li>
+</ul>
+
+<h3>
+<a id="number-string-collection" class="anchor" href="#number-string-collection" aria-hidden="true"><span class="octicon octicon-link"></span></a>Number, String, Collection</h3>
+
 <ul>
 <li><code>empty?</code></li>
-<li><code>eql?</code></li>
-<li><code>exclusion?</code></li>
 <li><code>filled?</code></li>
-<li><code>format?</code></li>
 <li><code>gt?</code></li>
 <li><code>gteq?</code></li>
-<li><code>inclusion?</code></li>
-<li><code>int?</code></li>
-<li><code>key?</code></li>
 <li><code>lt?</code></li>
 <li><code>lteq?</code></li>
 <li><code>max_size?</code></li>
 <li><code>min_size?</code></li>
-<li><code>nil?</code></li>
 <li><code>size?</code></li>
-<li><code>str?</code></li>
+<li><code>format?</code></li>
+<li><code>inclusion?</code></li>
+<li><code>exclusion?</code></li>
 </ul>
 
 <h2>
